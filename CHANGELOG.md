@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.4.0-alpha1] - 2026-08-28
+
 ### Added
 
 - QR payment webhook callback type (`PaymentQRWebhookCallback`) with
@@ -40,7 +42,8 @@ and this project adheres to
 
 - Payment link creation via `CreatePaymentLink`.
 
-[Unreleased]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.3.0-alpha...HEAD
+[Unreleased]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.4.0-alpha1...HEAD
+[0.4.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.3.0-alpha...v0.4.0-alpha1
 [0.3.0-alpha]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.2.0-alpha1...v0.3.0-alpha
 [0.2.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.2.0-alpha...v0.2.0-alpha1
 [0.2.0-alpha]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.1.0-alpha...v0.2.0-alpha

@@ -96,6 +96,55 @@ Creates a payment link and returns a redirect URL to send the customer to.
 | `RedirectURL` | `string` | URL to send the customer to for payment.  |
 | `OrderNo`     | `string` | The order number echoed back.             |
 
+### Webhook callbacks
+
+Phajay POSTs a `WebhookCallback` payload to your callback URL when a payment reaches a terminal state. Decode the request body into `WebhookCallback` to inspect the payment result:
+
+```go
+func handleWebhook(w http.ResponseWriter, r *http.Request) {
+	var cb phajay.WebhookCallback
+	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if cb.Status != nil && *cb.Status == phajay.WebhookStatusCompleted {
+		// Fulfil the order
+	}
+}
+```
+
+Different banks may return different subsets of the payload. The fields marked **guaranteed** are always present; all other fields are `*string` and are `nil` when the bank did not send them.
+
+#### `WebhookCallback`
+
+| Field            | Type       | Description                              |
+| ---------------- | ---------- | ---------------------------------------- |
+| `PaymentMethod`  | `string`   | **Guaranteed.** Payment method used.     |
+| `LinkCode`       | `string`   | **Guaranteed.** The payment link code.   |
+| `TransactionID`  | `string`   | **Guaranteed.** Gateway transaction ID.  |
+| `OrderNo`        | `string`   | **Guaranteed.** The order number echoed back. |
+| `TxnAmount`      | `float64`  | **Guaranteed.** Transaction amount.      |
+| `Message`        | `*string`  | Gateway response message.                |
+| `RefNo`          | `*string`  | Gateway reference number.                |
+| `ExReferenceNo`  | `*string`  | External reference number.               |
+| `MerchantName`   | `*string`  | Merchant name.                           |
+| `Memo`           | `*string`  | Raw payment memo.                        |
+| `TxnDateTime`    | `*string`  | Transaction date and time.               |
+| `BillNumber`     | `*string`  | Bill number.                             |
+| `SourceAccount`  | `*string`  | Source account number.                   |
+| `SourceName`     | `*string`  | Source account name.                     |
+| `SourceCurrency` | `*string`  | Source account currency.                 |
+| `PaymentID`      | `*string`  | Gateway payment ID.                      |
+| `Status`         | `*string`  | Terminal payment status.                 |
+| `Description`    | `*string`  | Order description.                       |
+| `Remark`         | `*string`  | Remark.                                  |
+| `Tag1`–`Tag6`    | `*string`  | Optional tags.                           |
+| `UserID`         | `*string`  | User ID.                                 |
+| `SuccessURL`     | `*string`  | URL to redirect the customer to.         |
+
+`WebhookStatusCompleted` (`"PAYMENT_COMPLETED"`) indicates a successful payment.
+
 ## Error handling
 
 `CreatePaymentLink` returns an error in the following cases:

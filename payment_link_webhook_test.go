@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestWebhookCallbackUnmarshal(t *testing.T) {
+func TestPaymentLinkWebhookCallbackUnmarshal(t *testing.T) {
 	payload := `{
   "message": "SUCCESS",
   "refNo": "001LNMI395488650608",
@@ -36,7 +36,7 @@ func TestWebhookCallbackUnmarshal(t *testing.T) {
   "successURL": "http://localhost:5174/payment/success?linkCode=1d180ad6-efca-49c5-be71-80b2e2095414&amount=1&description=Buy a product&orderNo=ORDER1757666411760"
 }`
 
-	var cb WebhookCallback
+	var cb PaymentLinkWebhookCallback
 	if err := json.Unmarshal([]byte(payload), &cb); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestWebhookCallbackUnmarshal(t *testing.T) {
 		{name: "SourceAccount", got: cb.SourceAccount, want: "138880037"},
 		{name: "SourceCurrency", got: cb.SourceCurrency, want: "LAK"},
 		{name: "PaymentID", got: cb.PaymentID, want: "68c3dc6c464ee95aafeb9319"},
-		{name: "Status", got: cb.Status, want: WebhookStatusCompleted},
+		{name: "Status", got: cb.Status, want: PaymentLinkWebhookStatusCompleted},
 		{name: "Description", got: cb.Description, want: "Buy a product"},
 		{name: "Remark", got: cb.Remark, want: ""},
 		{name: "Tag1", got: cb.Tag1, want: "6868a691f914536d6d731e63"},
@@ -92,7 +92,7 @@ func TestWebhookCallbackUnmarshal(t *testing.T) {
 	}
 }
 
-func TestWebhookCallbackMinimalPayload(t *testing.T) {
+func TestPaymentLinkWebhookCallbackMinimalPayload(t *testing.T) {
 	payload := `{
   "paymentMethod": "BCEL",
   "linkCode": "1d180ad6-efca-49c5-be71-80b2e2095414",
@@ -101,7 +101,7 @@ func TestWebhookCallbackMinimalPayload(t *testing.T) {
   "txnAmount": 1500.50
 }`
 
-	var cb WebhookCallback
+	var cb PaymentLinkWebhookCallback
 	if err := json.Unmarshal([]byte(payload), &cb); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}

@@ -1,11 +1,11 @@
 package phajay
 
-// WebhookCallback is the payload Phajay POSTs to your callback URL.
+// PaymentLinkWebhookCallback is the payload Phajay POSTs to your callback URL.
 //
 // paymentMethod, linkCode, transactionId, orderNo and txnAmount are
 // always present. All other fields may be nil — banks return different
 // subsets of the payload.
-type WebhookCallback struct {
+type PaymentLinkWebhookCallback struct {
 	// Guaranteed fields
 	PaymentMethod string  `json:"paymentMethod"`
 	LinkCode      string  `json:"linkCode"`
@@ -38,4 +38,4 @@ type WebhookCallback struct {
 	SuccessURL     *string `json:"successURL"`
 }
 
-const WebhookStatusCompleted = "PAYMENT_COMPLETED"
+const PaymentLinkWebhookStatusCompleted = "PAYMENT_COMPLETED"

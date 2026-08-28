@@ -96,19 +96,19 @@ Creates a payment link and returns a redirect URL to send the customer to.
 | `RedirectURL` | `string` | URL to send the customer to for payment.  |
 | `OrderNo`     | `string` | The order number echoed back.             |
 
-### Webhook callbacks
+### Payment link webhook callbacks
 
-Phajay POSTs a `WebhookCallback` payload to your callback URL when a payment reaches a terminal state. Decode the request body into `WebhookCallback` to inspect the payment result:
+Phajay POSTs a `PaymentLinkWebhookCallback` payload to your callback URL when a payment reaches a terminal state. Decode the request body into `PaymentLinkWebhookCallback` to inspect the payment result:
 
 ```go
-func handleWebhook(w http.ResponseWriter, r *http.Request) {
-	var cb phajay.WebhookCallback
+func handlePaymentLinkWebhook(w http.ResponseWriter, r *http.Request) {
+	var cb phajay.PaymentLinkWebhookCallback
 	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 
-	if cb.Status != nil && *cb.Status == phajay.WebhookStatusCompleted {
+	if cb.Status != nil && *cb.Status == phajay.PaymentLinkWebhookStatusCompleted {
 		// Fulfil the order
 	}
 }
@@ -116,7 +116,7 @@ func handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 Different banks may return different subsets of the payload. The fields marked **guaranteed** are always present; all other fields are `*string` and are `nil` when the bank did not send them.
 
-#### `WebhookCallback`
+#### `PaymentLinkWebhookCallback`
 
 | Field            | Type       | Description                              |
 | ---------------- | ---------- | ---------------------------------------- |
@@ -143,7 +143,7 @@ Different banks may return different subsets of the payload. The fields marked *
 | `UserID`         | `*string`  | User ID.                                 |
 | `SuccessURL`     | `*string`  | URL to redirect the customer to.         |
 
-`WebhookStatusCompleted` (`"PAYMENT_COMPLETED"`) indicates a successful payment.
+`PaymentLinkWebhookStatusCompleted` (`"PAYMENT_COMPLETED"`) indicates a successful payment.
 
 ## Error handling
 

@@ -3,7 +3,9 @@
 [![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The official Go SDK for the [Phajay](https://payment-gateway.phajay.co) payment gateway.
+An unofficial Go SDK for the [Phajay](https://payment-gateway.phajay.co) payment gateway.
+
+Official API documentation: <https://payment-doc.phajay.co/v1>
 
 Currently supports creating payment links, with more payment methods on the way.
 

@@ -7,7 +7,7 @@ An unofficial Go SDK for the [Phajay](https://payment-gateway.phajay.co) payment
 
 Official API documentation: <https://payment-doc.phajay.co/v1>
 
-Currently supports creating payment links, with more payment methods on the way.
+Currently supports creating payment links and generating bank QR codes for JDB, LDB, IB, BCEL, STB and M MoneyX.
 
 ## Installation
 
@@ -145,13 +145,63 @@ Different banks may return different subsets of the payload. The fields marked *
 
 `PaymentLinkWebhookStatusCompleted` (`"PAYMENT_COMPLETED"`) indicates a successful payment.
 
+### `GenerateQR(ctx context.Context, bank Bank, request PaymentQRRequest) (PaymentQRResponse, error)`
+
+Generates a QR code string for a bank so the customer can pay through the bank's Mobile Banking app.
+
+```go
+resp, err := client.GenerateQR(context.Background(), phajay.BankBCEL, phajay.PaymentQRRequest{
+	Amount:      1500.50,
+	Description: "Order #0001",
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println("QR string:", resp.QRCode)
+fmt.Println("Deeplink:", resp.Link)
+```
+
+Supported banks:
+
+| Constant        | Bank                                                          |
+| --------------- | ------------------------------------------------------------- |
+| `BankJDB`       | Joint Development Bank (JDB)                                  |
+| `BankLDB`       | Lao Development Bank (LDB)                                    |
+| `BankIB`        | Indochina Bank (IB)                                           |
+| `BankBCEL`      | Banque Pour Le Commerce Exterieur Lao Public (BCEL)           |
+| `BankSTB`       | ST Bank Laos (STB)                                            |
+| `BankMMoneyX`   | M MoneyX                                                      |
+
+The API key is sent as the `secretKey` request header. Note that BCEL does not currently support Thai/Lao characters in `description`.
+
+#### `PaymentQRRequest`
+
+| Field         | Type     | Required | Description                  |
+| ------------- | -------- | -------- | ---------------------------- |
+| `Amount`      | `float64`| **yes**  | Amount to be paid. Must be greater than zero. |
+| `Description` | `string` | **yes**  | Payment description.         |
+| `Tag1`        | `string` | no       | Custom field #1 for your internal reference. |
+| `Tag2`        | `string` | no       | Custom field #2 for your internal reference. |
+| `Tag3`        | `string` | no       | Custom field #3 for your internal reference. |
+
+#### `PaymentQRResponse`
+
+| Field           | Type     | Description                              |
+| --------------- | -------- | ---------------------------------------- |
+| `Message`       | `string` | Response message from the gateway.       |
+| `TransactionID` | `string` | Gateway transaction ID.                  |
+| `QRCode`        | `string` | The QR string of the transaction.        |
+| `Link`          | `string` | Deeplink to open the bank's app.         |
+
 ## Error handling
 
-`CreatePaymentLink` returns an error in the following cases:
+`CreatePaymentLink` and `GenerateQR` return an error in the following cases:
 
 - **Validation errors** — `amount` is zero or negative, or `description` is empty. These fail before any request is sent.
 - **HTTP errors** — any non-2xx response, including the response body in the error message.
 - **Transport/encoding errors** — request construction, network, and JSON decode failures.
+- **Unknown bank** — `GenerateQR` returns an error when passed a `Bank` value that is not one of the supported banks.
 
 ```go
 resp, err := client.CreatePaymentLink(ctx, phajay.PaymentLinkRequest{Amount: 0, Description: ""})

@@ -1,9 +1,9 @@
-# Phajay Payment Gateway
+# Phajay Payment Gateway SDK for Go
 
 [![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A Go client library for the [Phajay](https://payment-gateway.phajay.co) payment gateway.
+The official Go SDK for the [Phajay](https://payment-gateway.phajay.co) payment gateway.
 
 Currently supports creating payment links, with more payment methods on the way.
 
@@ -45,7 +45,7 @@ func main() {
 
 ## Configuration options
 
-`phajay.New` accepts a key and optional functional options:
+`phajay.New` accepts your API key and optional functional options:
 
 | Option         | Type             | Description                                    | Default                          |
 | -------------- | ---------------- | ---------------------------------------------- | -------------------------------- |
@@ -63,7 +63,7 @@ client := phajay.New(
 
 ## Authentication
 
-The API key is sent as HTTP Basic authentication — the key is base64-encoded and used as the credentials. All requests are sent over HTTPS.
+Your API key is sent as HTTP Basic authentication — the key is base64-encoded and used as the credentials. All requests are sent over HTTPS. Keep your key secret and never commit it to version control.
 
 ## API reference
 

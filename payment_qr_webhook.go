@@ -3,13 +3,16 @@ package phajay
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 )
 
 // FlexibleString is a string that also unmarshals from a JSON number,
-// normalised to its decimal form. Phajay returns refNo as a string for
+// preserving its numeric text. Phajay returns refNo as a string for
 // some banks and a number for others.
 type FlexibleString string
 
+// UnmarshalJSON decodes a JSON string, number, or null without losing integer
+// precision. Numeric text retains its original JSON representation.
 func (s *FlexibleString) UnmarshalJSON(data []byte) error {
 	data = bytes.TrimSpace(data)
 	if len(data) == 0 || string(data) == "null" {
@@ -19,14 +22,14 @@ func (s *FlexibleString) UnmarshalJSON(data []byte) error {
 	if data[0] == '"' {
 		var str string
 		if err := json.Unmarshal(data, &str); err != nil {
-			return err
+			return fmt.Errorf("phajay: decode flexible string: %w", err)
 		}
 		*s = FlexibleString(str)
 		return nil
 	}
 	var num json.Number
 	if err := json.Unmarshal(data, &num); err != nil {
-		return err
+		return fmt.Errorf("phajay: decode flexible string number: %w", err)
 	}
 	*s = FlexibleString(num.String())
 	return nil
@@ -35,18 +38,18 @@ func (s *FlexibleString) UnmarshalJSON(data []byte) error {
 // PaymentQRWebhookCallback is the payload Phajay POSTs to your callback URL
 // when a QR payment reaches a terminal state.
 //
-// paymentMethod, transactionId, billNumber, txnAmount and status are
+// paymentMethod, transactionId and txnAmount are
 // always present. All other fields may be nil — banks return different
 // subsets of the payload.
 type PaymentQRWebhookCallback struct {
 	// Guaranteed fields
 	PaymentMethod string  `json:"paymentMethod"`
 	TransactionID string  `json:"transactionId"`
-	BillNumber    string  `json:"billNumber"`
 	TxnAmount     float64 `json:"txnAmount"`
-	Status        string  `json:"status"`
 
 	// Optional fields — nil when the bank did not send them
+	BillNumber     *string         `json:"billNumber"`
+	Status         *string         `json:"status"`
 	Message        *string         `json:"message"`
 	RefNo          *FlexibleString `json:"refNo"`
 	ExReferenceNo  *string         `json:"exReferenceNo"`
@@ -65,4 +68,5 @@ type PaymentQRWebhookCallback struct {
 	Tag6           *string         `json:"tag6"`
 }
 
+// PaymentQRWebhookStatusCompleted identifies a completed QR payment.
 const PaymentQRWebhookStatusCompleted = "PAYMENT_COMPLETED"

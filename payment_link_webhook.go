@@ -1,5 +1,10 @@
 package phajay
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // PaymentLinkWebhookCallback is the payload Phajay POSTs to your callback URL.
 //
 // paymentMethod, linkCode, transactionId, orderNo and txnAmount are
@@ -38,4 +43,30 @@ type PaymentLinkWebhookCallback struct {
 	SuccessURL     *string `json:"successURL"`
 }
 
+// UnmarshalJSON accepts refNo as either a string or a number while retaining the
+// existing *string field type. Missing and null references remain nil.
+func (cb *PaymentLinkWebhookCallback) UnmarshalJSON(data []byte) error {
+	type plain PaymentLinkWebhookCallback
+	decoded := struct {
+		*plain
+		RefNo json.RawMessage `json:"refNo"`
+	}{plain: (*plain)(cb)}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return fmt.Errorf("phajay: decode payment link webhook: %w", err)
+	}
+	if len(decoded.RefNo) != 0 {
+		var ref *FlexibleString
+		if err := json.Unmarshal(decoded.RefNo, &ref); err != nil {
+			return fmt.Errorf("phajay: decode payment link webhook refNo: %w", err)
+		}
+		cb.RefNo = nil
+		if ref != nil {
+			value := string(*ref)
+			cb.RefNo = &value
+		}
+	}
+	return nil
+}
+
+// PaymentLinkWebhookStatusCompleted identifies a completed payment link.
 const PaymentLinkWebhookStatusCompleted = "PAYMENT_COMPLETED"

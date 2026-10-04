@@ -41,14 +41,14 @@ func TestPaymentQRWebhookCallbackUnmarshal(t *testing.T) {
 	if cb.TransactionID != "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf" {
 		t.Errorf("TransactionID = %q, want %q", cb.TransactionID, "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf")
 	}
-	if cb.BillNumber != "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf" {
-		t.Errorf("BillNumber = %q, want %q", cb.BillNumber, "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf")
+	if cb.BillNumber == nil || *cb.BillNumber != "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf" {
+		t.Errorf("BillNumber = %v, want %q", cb.BillNumber, "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf")
 	}
 	if cb.TxnAmount != 1 {
 		t.Errorf("TxnAmount = %v, want %v", cb.TxnAmount, 1)
 	}
-	if cb.Status != PaymentQRWebhookStatusCompleted {
-		t.Errorf("Status = %q, want %q", cb.Status, PaymentQRWebhookStatusCompleted)
+	if cb.Status == nil || *cb.Status != PaymentQRWebhookStatusCompleted {
+		t.Errorf("Status = %v, want %q", cb.Status, PaymentQRWebhookStatusCompleted)
 	}
 
 	if cb.RefNo == nil {
@@ -112,14 +112,14 @@ func TestPaymentQRWebhookCallbackMinimalPayload(t *testing.T) {
 	if cb.TransactionID != "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf" {
 		t.Errorf("TransactionID = %q, want %q", cb.TransactionID, "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf")
 	}
-	if cb.BillNumber != "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf" {
-		t.Errorf("BillNumber = %q, want %q", cb.BillNumber, "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf")
+	if cb.BillNumber == nil || *cb.BillNumber != "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf" {
+		t.Errorf("BillNumber = %v, want %q", cb.BillNumber, "81f8b0a6-9277-45e5-a6d2-8c1bd248bedf")
 	}
 	if cb.TxnAmount != 1 {
 		t.Errorf("TxnAmount = %v, want %v", cb.TxnAmount, 1)
 	}
-	if cb.Status != PaymentQRWebhookStatusCompleted {
-		t.Errorf("Status = %q, want %q", cb.Status, PaymentQRWebhookStatusCompleted)
+	if cb.Status == nil || *cb.Status != PaymentQRWebhookStatusCompleted {
+		t.Errorf("Status = %v, want %q", cb.Status, PaymentQRWebhookStatusCompleted)
 	}
 
 	if cb.Message != nil {

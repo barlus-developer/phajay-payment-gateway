@@ -12,7 +12,7 @@ Go. This document describes how to report issues and propose changes.
 ```bash
 git clone https://github.com/barlus-developer/phajay-payment-gateway.git
 cd phajay-payment-gateway
-go test ./...
+go test ./... -race -cover
 ```
 
 ## Reporting issues
@@ -44,7 +44,9 @@ avoid duplicates. A good issue includes:
    gofmt -w .
    ```
 
-6. Open a pull request against `main` with a clear description of the problem
+6. Run `go vet ./...`.
+7. Update `README.md`, `CHANGELOG.md`, and this guide when the public API changes.
+8. Open a pull request against `main` with a clear description of the problem
    and solution.
 
 ## Code style
@@ -52,6 +54,38 @@ avoid duplicates. A good issue includes:
 - Follow standard Go conventions (`gofmt`, `go vet`).
 - Keep exported types and functions documented with Go doc comments.
 - Write table-driven tests for new behaviour.
+- Keep the package flat and dependency-free; preserve the functional-options API.
+- Wrap underlying errors with `%w` and prefix SDK errors with `phajay: `.
+- Validate inputs before sending requests, including finite positive amounts.
+
+## Gateway API changes
+
+Use the [official v1 documentation](https://payment-doc.lailaolab.com/v1) as the
+source for routes, HTTP methods, authentication, field names, and nullability.
+Add `httptest` coverage for request bodies, headers, response decoding, failure
+responses, cancellation, and validation that sends no HTTP requests. Use literal
+documented paths in expectations so a route typo cannot also change the test.
+
+Payment links, credit card links, and transaction status use Basic auth with
+base64 of the raw key. QR, refund, and subscription routes use `secretKey`.
+Use the shared request helper to keep response closing and error wrapping
+consistent. Payment and subscription creation methods must not retry by default.
+
+Sandbox has different paths on the same gateway host. Add a sandbox route only
+when documented; unsupported sandbox methods must fail before HTTP instead of
+falling through to production. M MoneyX, transaction status, refunds, credit
+cards, and subscriptions currently have no documented test routes.
+
+Preserve optional callback fields as pointers. The documented QR guarantees are
+`paymentMethod`, `transactionId`, and `txnAmount`; `billNumber` and `status` may
+be absent. Link `refNo` accepts numbers and strings without changing its public
+`*string` type. Card payloads can contain null nested fields, and subscription
+`paymentTransactionId` is present only on debit events. Mark type changes as
+breaking and provide migration examples in README and CHANGELOG.
+
+The [webhook verification page](https://payment-doc.lailaolab.com/v1/verify-webhook-signature)
+does not publish the signing algorithm or header format. Do not invent a
+verifier; implementing one requires the guide and key supplied by Phajay support.
 
 ## Commit messages
 

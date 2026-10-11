@@ -33,7 +33,7 @@ func TestCreatePaymentLink(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key", BaseURL: srv.URL})
 	resp, err := p.CreatePaymentLink(context.Background(), PaymentLinkRequest{
 		OrderNo:     "ORD-001",
 		Amount:      1500.50,
@@ -73,7 +73,7 @@ func TestCreatePaymentLinkValidation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL))
 
 	tests := []struct {
 		name    string
@@ -99,7 +99,7 @@ func TestCreatePaymentLinkServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL))
 	_, err := p.CreatePaymentLink(context.Background(), PaymentLinkRequest{Amount: 10, Description: "x"})
 	if err == nil {
 		t.Fatal("expected error, got nil")

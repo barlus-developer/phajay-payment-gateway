@@ -8,6 +8,35 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-11
+
+### Added
+
+- `Config` with API key, optional base URL, separate webhook signing key, and
+  explicit development/testing signature bypass (default false).
+- Reusable `VerifyWebhookSignature` and `DecodeWebhook` methods, with
+  inspectable missing-key and verification-unavailable errors.
+- Tests covering configuration, mandatory verification, missing/blank signing
+  keys, rejected candidate signatures, sandbox policy, bypass decoding for all
+  callback types, and JSON error wrapping.
+
+### Changed
+
+- **Breaking:** `New` accepts `Config` instead of a key string. Migrate
+  `New("key", opts...)` to `New(Config{APIKey: "key"}, opts...)`.
+  Existing functional options are preserved and applied after Config.
+- Client-managed webhook decoding requires verification by default and leaves
+  callback data untouched on verification failures. Missing signing configuration
+  never enables bypass; sandbox does not bypass verification either.
+
+### Security limitation
+
+- Phajay's public guide withholds the signing algorithm, payload, encoding, and
+  header format. Verification fails closed for every request until the private
+  specification is available. Valid-signature tests and cryptographic comparison
+  are deferred; no signing scheme has been invented. Explicit bypass permits
+  unauthenticated decoding only for development and tests.
+
 ## [0.5.0-alpha1] - 2026-10-11
 
 ### Added
@@ -79,7 +108,8 @@ and this project adheres to
 
 - Payment link creation via `CreatePaymentLink`.
 
-[Unreleased]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.5.0-alpha1...HEAD
+[Unreleased]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.5.0-alpha1...v0.5.1
 [0.5.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.4.0-alpha1...v0.5.0-alpha1
 [0.4.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.3.0-alpha...v0.4.0-alpha1
 [0.3.0-alpha]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.2.0-alpha1...v0.3.0-alpha

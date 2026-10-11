@@ -11,6 +11,29 @@ import (
 	"time"
 )
 
+func TestClientConfig(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		config  Config
+		opts    []Option
+		baseURL string
+	}{
+		{"zero config", Config{}, nil, defaultBaseURL},
+		{"API and signing keys", Config{APIKey: "api-key", WebhookSignatureKey: "signing-key"}, nil, defaultBaseURL},
+		{"custom base URL", Config{BaseURL: "https://example.com"}, nil, "https://example.com"},
+		{"option overrides config URL", Config{BaseURL: "https://example.com"}, []Option{WithBaseURL("https://override.example.com")}, "https://override.example.com"},
+		{"explicit bypass", Config{BypassSignatureVerification: true}, nil, defaultBaseURL},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New(tt.config, tt.opts...)
+			if p.key != tt.config.APIKey || p.webhookSignatureKey != tt.config.WebhookSignatureKey ||
+				p.bypassSignatureVerification != tt.config.BypassSignatureVerification || p.baseURL != tt.baseURL {
+				t.Fatal("client configuration was not applied correctly")
+			}
+		})
+	}
+}
+
 func TestClientOptions(t *testing.T) {
 	original := &http.Client{Timeout: time.Second}
 	for _, tt := range []struct {
@@ -28,7 +51,7 @@ func TestClientOptions(t *testing.T) {
 		{"sandbox", []Option{WithSandbox()}, 30 * time.Second, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			p := New("key", tt.opts...)
+			p := New(Config{APIKey: "key"}, tt.opts...)
 			if p.client.Timeout != tt.timeout || p.sandbox != tt.sandbox || p.baseURL != "https://payment-gateway.phajay.co" {
 				t.Fatalf("client = %#v", p)
 			}
@@ -45,11 +68,11 @@ func (f testTransport) RoundTrip(r *http.Request) (*http.Response, error) { retu
 
 func TestClientWrapsUnderlyingErrors(t *testing.T) {
 	sentinel := errors.New("connection failed")
-	p := New("key", WithHTTPClient(&http.Client{Transport: testTransport(func(r *http.Request) (*http.Response, error) { return nil, sentinel })}))
+	p := New(Config{APIKey: "key"}, WithHTTPClient(&http.Client{Transport: testTransport(func(r *http.Request) (*http.Response, error) { return nil, sentinel })}))
 	if _, err := p.CreatePaymentLink(context.Background(), PaymentLinkRequest{Amount: 1, Description: "x"}); !errors.Is(err, sentinel) {
 		t.Errorf("error = %v", err)
 	}
-	p = New("key", WithBaseURL("://invalid"))
+	p = New(Config{APIKey: "key"}, WithBaseURL("://invalid"))
 	if _, err := p.GenerateQR(context.Background(), BankJDB, PaymentQRRequest{Amount: 1, Description: "x"}); err == nil || !strings.Contains(err.Error(), "build") {
 		t.Errorf("error = %v", err)
 	}
@@ -61,7 +84,7 @@ func TestAPIErrorBodyLimit(t *testing.T) {
 		_, _ = io.WriteString(w, strings.Repeat("x", (1<<20)+100))
 	}))
 	defer srv.Close()
-	_, err := New("key", WithBaseURL(srv.URL)).CreatePaymentLink(context.Background(), PaymentLinkRequest{Amount: 1, Description: "x"})
+	_, err := New(Config{APIKey: "key"}, WithBaseURL(srv.URL)).CreatePaymentLink(context.Background(), PaymentLinkRequest{Amount: 1, Description: "x"})
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || len(apiErr.Body) != 1<<20 || apiErr.StatusCode != 400 {
 		t.Fatalf("error = %v", err)

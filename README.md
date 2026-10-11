@@ -82,7 +82,7 @@ import (
 )
 
 func main() {
-	client := phajay.New("your-api-key")
+	client := phajay.New(phajay.Config{APIKey: "your-api-key"})
 
 	resp, err := client.CreatePaymentLink(context.Background(), phajay.PaymentLinkRequest{
 		OrderNo:     "ORD-20260828-0001",
@@ -100,7 +100,43 @@ func main() {
 
 ## Configuration
 
-`phajay.New` takes your API key followed by optional functional options:
+`phajay.New` takes a `Config` followed by optional functional options:
+
+| Config field | Type | Description | Default |
+| --- | --- | --- | --- |
+| `APIKey` | `string` | Authenticates outgoing API requests. | empty |
+| `BaseURL` | `string` | Optional trusted API base URL. | `https://payment-gateway.phajay.co` |
+| `WebhookSignatureKey` | `string` | Separate webhook signing key from Phajay support; never inferred from `APIKey`. | empty |
+| `BypassSignatureVerification` | `bool` | Skips verification entirely; development and testing only. | **`false`** |
+
+Production configuration requires webhook verification by default:
+
+```go
+client := phajay.New(phajay.Config{
+    APIKey:              "your-api-key",
+    WebhookSignatureKey: "your-signature-key",
+})
+```
+
+**Current limitation:** the signing specification is private. Configuring a key
+alone does not enable successful verification; the SDK rejects all webhooks
+until the official method can be implemented. See [Webhook verification](#webhook-verification).
+
+For development or testing, bypass must be explicit:
+
+```go
+client := phajay.New(phajay.Config{
+    APIKey:                      "your-api-key",
+    BypassSignatureVerification: true,
+})
+```
+
+**Security warning:** bypassed webhooks are unauthenticated. Never enable bypass
+in production or use bypassed data to authorize fulfillment or financial actions.
+Missing or blank signing keys never enable bypass. `WithSandbox()` does not
+change the verification policy.
+
+Transport and sandbox options remain available:
 
 | Option          | Type            | Description                                        | Default                             |
 | --------------- | --------------- | -------------------------------------------------- | ----------------------------------- |
@@ -111,13 +147,14 @@ func main() {
 
 ```go
 client := phajay.New(
-	"your-test-key",
+	phajay.Config{APIKey: "your-test-key"},
 	phajay.WithSandbox(),
 	phajay.WithTimeout(15*time.Second),
 )
 ```
 
-Options are applied in order. `WithTimeout` after `WithHTTPClient` overrides
+Options are applied after Config, in order. `WithBaseURL` overrides
+`Config.BaseURL`. `WithTimeout` after `WithHTTPClient` overrides
 that client's timeout without modifying the supplied client. In the reverse
 order, the custom client's timeout takes precedence. A zero timeout disables it.
 Clients may be shared between goroutines after construction.
@@ -148,7 +185,7 @@ it to version control or expose it in client-side code.
 
 ### Client
 
-`New(key string, opts ...Option) *Phajay` constructs a new client. See
+`New(config Config, opts ...Option) *Phajay` constructs a new client. See
 [Configuration](#configuration) for available options.
 
 ### Payment links
@@ -179,14 +216,20 @@ creates a payment link and returns the redirect URL to send your customer to.
 
 When a payment link reaches a terminal state, Phajay POSTs a
 `PaymentLinkWebhookCallback` payload to your callback URL. Decode the request
-body to inspect the result:
+body through `client.DecodeWebhook` to inspect the result:
 
 ```go
 func handlePaymentLinkWebhook(w http.ResponseWriter, r *http.Request) {
-	// Verify the raw request signature first using the Phajay support guide.
-	var cb phajay.PaymentLinkWebhookCallback
-	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
+	// Requires io and net/http imports and a configured client in scope.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	var cb phajay.PaymentLinkWebhookCallback
+	if err := client.DecodeWebhook(rawBody, r.Header, &cb); err != nil {
+		http.Error(w, "webhook rejected", http.StatusBadRequest)
 		return
 	}
 
@@ -292,10 +335,16 @@ to inspect the result:
 
 ```go
 func handleQRWebhook(w http.ResponseWriter, r *http.Request) {
-	// Verify the raw request signature first using the Phajay support guide.
-	var cb phajay.PaymentQRWebhookCallback
-	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
+	// Requires io and net/http imports and a configured client in scope.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	var cb phajay.PaymentQRWebhookCallback
+	if err := client.DecodeWebhook(rawBody, r.Header, &cb); err != nil {
+		http.Error(w, "webhook rejected", http.StatusBadRequest)
 		return
 	}
 
@@ -571,15 +620,59 @@ which differs from production. All fields are optional pointers.
 
 ## Webhook verification
 
-The [official verification page](https://payment-doc.lailaolab.com/v1/verify-webhook-signature)
-requires contacting Phajay support for the signing method and key; neither is
-public. The SDK decodes payloads but does not authenticate incoming requests.
-Before using the webhook examples, verify the signature over the original
-request body following the guide supplied for your platform. Treat redirects
-as navigation; confirm payment using a verified webhook or the authenticated
-status API, and match saved order identifiers, amount, and currency.
+`VerifyWebhookSignature(rawBody []byte, headers http.Header) error` is the
+reusable verification entry point.
+`DecodeWebhook(rawBody []byte, headers http.Header, callback any) error` calls it
+before JSON decoding into a non-nil callback pointer. Read the request body once
+and pass the exact bytes and HTTP headers; do not parse and re-serialize JSON.
+The decoder supports all callback types listed above and rejects trailing JSON.
+A verification failure leaves the callback untouched. Discard callback data on
+any decoding error.
+
+The [official verification page](https://payment-doc.phajay.co/v1/verify-webhook-signature)
+explicitly says the verification method and signing key are not published.
+Request the private guide from [Phajay support](https://portal.phajay.co).
+The algorithm, signed payload, encoding, header name, and key format cannot be
+implemented or validated from the public documentation. This SDK therefore
+**fails closed** without guessing a signing scheme:
+
+| Setting | Verification and decoding behavior |
+| --- | --- |
+| Default `false`, missing or blank signing key | `ErrWebhookSignatureKeyMissing`; no decoding. |
+| Default `false`, configured signing key | `ErrWebhookSignatureVerificationUnavailable` for every request; no decoding, regardless of supplied signatures. |
+| Explicit `true` | No signature checks; JSON decoding is allowed, but the data is **unauthenticated**. |
+
+Use `errors.Is` to inspect these errors. Even an otherwise valid signed webhook
+cannot currently be accepted with verification enabled. Valid signature tests
+and constant-time cryptographic comparison require the private specification
+and test vectors; no cryptographic verifier is implemented yet.
+
+Direct `json.Unmarshal` into a callback remains available for payload modeling
+and tests, but does not enforce the client's verification policy or authenticate
+the sender. Use `DecodeWebhook` for client-managed webhook handling. A nil error
+in bypass mode means only that the JSON decoded successfully.
+
+Treat redirects as navigation; confirm payment using an authenticated status
+API response until verified webhooks are supported. Match saved transaction
+identifiers, amount, and currency, and process each payment once.
 
 ## Migration notes
+
+**Breaking:** `New` now accepts `Config` instead of an API key string:
+
+```go
+// Before: client := phajay.New("your-api-key", phajay.WithTimeout(15*time.Second))
+client := phajay.New(phajay.Config{
+    APIKey:              "your-api-key",
+    WebhookSignatureKey: "your-signature-key",
+}, phajay.WithTimeout(15*time.Second))
+```
+
+Existing options continue to work. `Config.BaseURL` also configures the API host.
+Replace direct webhook JSON decoding with `client.DecodeWebhook(rawBody,
+r.Header, &callback)` to enforce the client policy. This currently rejects
+production webhooks because the private signing method is unavailable; do not
+enable bypass as a workaround in production.
 
 `PaymentQRWebhookCallback.BillNumber` and `.Status` changed from `string` to
 `*string` because they are not guaranteed by the current callback guide. Check

@@ -48,7 +48,7 @@ func TestSandboxEndpoints(t *testing.T) {
 				}
 			}))
 			defer srv.Close()
-			p := New("test-key", WithSandbox(), WithBaseURL(srv.URL))
+			p := New(Config{APIKey: "test-key"}, WithSandbox(), WithBaseURL(srv.URL))
 			if tt.bank == 0 {
 				got, err := p.CreatePaymentLink(context.Background(), PaymentLinkRequest{OrderNo: "ORD-1", Amount: 10, Description: "Order"})
 				if err != nil || got.RedirectURL != "https://pay.example/test" {
@@ -68,7 +68,7 @@ func TestSandboxUnsupportedBank(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
 	defer srv.Close()
-	p := New("test-key", WithSandbox(), WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key"}, WithSandbox(), WithBaseURL(srv.URL))
 	for _, bank := range []Bank{BankMMoneyX, Bank(0), Bank(100)} {
 		if _, err := p.GenerateQR(context.Background(), bank, PaymentQRRequest{Amount: 10, Description: "Order"}); err == nil {
 			t.Errorf("bank %d accepted", bank)

@@ -39,6 +39,7 @@ go doc .
 | Shared HTTP behavior or errors | `request.go`, `phajay_test.go`, `endpoints_test.go` |
 | Payment links or bank QR | `payment_link.go`, `payment_qr.go`, and their matching tests |
 | Status, refunds, cards, subscriptions | `transaction.go`, `refund.go`, `payment_credit_card.go`, `subscription.go`, `endpoints_test.go` |
+| Webhook verification policy | `webhook.go`, `webhook_test.go` |
 | Callback fields or decoding | The corresponding `*_webhook.go`, `callbacks_test.go`, and `*_webhook_test.go` |
 | Sandbox routing | `payment_link.go`, `payment_qr.go`, `request.go`, `sandbox_test.go` |
 | User documentation | `README.md`, `docs/INTEGRATION.md`, `docs/ARCHITECTURE.md`, `docs/README.md` |
@@ -89,7 +90,8 @@ avoid duplicates. A good issue includes:
 - Document exported constants and methods too; describe constraints, errors,
   and optional fields that a caller needs to handle.
 - Write table-driven tests for new behaviour.
-- Keep the package flat and dependency-free; preserve the functional-options API.
+- Keep the package flat and dependency-free; use `New(Config, opts...)` and
+  preserve functional options after Config.
 - Wrap underlying errors with `%w` and prefix SDK errors with `phajay: `.
 - Validate inputs before sending requests, including finite positive amounts.
 
@@ -111,7 +113,8 @@ avoid duplicates. A good issue includes:
    bank also needs its `Bank` constant, `bankPath` mapping, and explicit sandbox
    behavior.
 
-Use `WithBaseURL(server.URL)` to direct the client to an `httptest` server.
+Use `New(Config{APIKey: "test-key", BaseURL: server.URL})` or
+`WithBaseURL(server.URL)` to direct the client to an `httptest` server.
 Use `WithHTTPClient` for transport-specific behavior. Avoid real payment or
 refund requests in the unit suite.
 
@@ -154,7 +157,11 @@ architecture guide. Use relative links for repository files.
 Label fragments with their assumed variables and imports. Complete programs
 must include package and import declarations. Use placeholder credentials and
 application-generated identifiers. Webhook examples must require verification
-before processing callback data; the SDK has no signature verifier.
+before processing callback data. Use `DecodeWebhook` with original bytes and
+headers to enforce the client policy. Verification currently fails closed:
+missing/blank signing keys return `ErrWebhookSignatureKeyMissing`, and configured
+keys return `ErrWebhookSignatureVerificationUnavailable`. Explicit bypass is
+only for development or tests and never authenticates an event.
 
 For public API changes, update the README field tables, this contributor guide,
 and `CHANGELOG.md` under `Unreleased`. Include migration examples and a breaking
@@ -189,7 +196,14 @@ breaking and provide migration examples in README and CHANGELOG.
 
 The [webhook verification page](https://payment-doc.lailaolab.com/v1/verify-webhook-signature)
 does not publish the signing algorithm or header format. Do not invent a
-verifier; implementing one requires the guide and key supplied by Phajay support.
+signing scheme; cryptographic verification requires the private guide supplied
+by Phajay support. Preserve the fail-closed policy until that guide is available.
+Do not infer a signing key from `APIKey`, guess the signature header, or enable
+bypass when configuration is missing. Once the specification is available,
+implement its exact payload and encoding, reject missing/malformed/invalid
+signatures, use constant-time comparison where applicable, and add official
+valid-signature vectors plus tampering tests. Development bypass tests must
+exercise every callback type without claiming sender authentication.
 
 ## Commit messages
 

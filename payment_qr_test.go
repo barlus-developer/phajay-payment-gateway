@@ -32,7 +32,7 @@ func TestGenerateQR(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key", BaseURL: srv.URL})
 	resp, err := p.GenerateQR(context.Background(), BankJDB, PaymentQRRequest{
 		Amount:      1500.50,
 		Description: "Buy Pants",
@@ -96,7 +96,7 @@ func TestGenerateQRBankPaths(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			p := New("test-key", WithBaseURL(srv.URL))
+			p := New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL))
 			if _, err := p.GenerateQR(context.Background(), tt.bank, PaymentQRRequest{Amount: 10, Description: "x"}); err != nil {
 				t.Fatalf("GenerateQR() error = %v", err)
 			}
@@ -113,7 +113,7 @@ func TestGenerateQRValidation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL))
 
 	tests := []struct {
 		name    string
@@ -138,7 +138,7 @@ func TestGenerateQRUnknownBank(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL))
 	_, err := p.GenerateQR(context.Background(), Bank(0), PaymentQRRequest{Amount: 10, Description: "x"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -155,7 +155,7 @@ func TestGenerateQRServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := New("test-key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL))
 	_, err := p.GenerateQR(context.Background(), BankJDB, PaymentQRRequest{Amount: 10, Description: "x"})
 	if err == nil {
 		t.Fatal("expected error, got nil")

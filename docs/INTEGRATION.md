@@ -62,7 +62,7 @@ func main() {
 		log.Fatal("PHAJAY_SECRET_KEY is required")
 	}
 
-	client := phajay.New(secretKey, phajay.WithTimeout(15*time.Second))
+	client := phajay.New(phajay.Config{APIKey: secretKey}, phajay.WithTimeout(15*time.Second))
 	orderID := "order-123" // Replace with a unique order ID.
 	response, err := client.CreatePaymentLink(context.Background(), phajay.PaymentLinkRequest{
 		OrderNo:     orderID,
@@ -79,16 +79,22 @@ func main() {
 
 ## Create a client
 
-Use the secret key for production. Set a timeout that fits your application:
+Use the API key for outgoing requests and a separate signing key for webhooks.
+Set a timeout that fits your application. Verification is mandatory by default,
+but currently fails closed until Phajay's private signing guide is available:
 
 ```go
 client := phajay.New(
-	secretKey,
+	phajay.Config{
+		APIKey:              secretKey,
+		WebhookSignatureKey: webhookSignatureKey,
+	},
 	phajay.WithTimeout(15*time.Second),
 )
 ```
 
-Pass the same client to the parts of your service that call Phajay. The client
+`secretKey` and `webhookSignatureKey` are application configuration values;
+load them from your secret store or environment. Pass the same client to the parts of your service that call Phajay. The client
 can be shared across goroutines after construction. Use `WithHTTPClient` if you
 need a custom transport or test client.
 
@@ -115,19 +121,19 @@ context deadline when a request must finish within a defined time.
 ```go
 httpClient := &http.Client{Timeout: 20 * time.Second}
 client := phajay.New(
-	secretKey,
+	phajay.Config{APIKey: secretKey},
 	phajay.WithHTTPClient(httpClient),
 	phajay.WithTimeout(15*time.Second),
 )
 ```
 
-Options apply in order; here the SDK client uses 15 seconds. Reversing the last
-two options makes the supplied client's 20-second timeout take precedence.
+Options apply after Config, in order; here the SDK client uses 15 seconds.
+Reversing the last two options makes the supplied client's 20-second timeout take precedence.
 `WithHTTPClient` copies the `http.Client` value, leaving its original timeout
 unchanged. The transport and other referenced objects remain shared; custom
 transports must support concurrent calls. A nil HTTP client keeps the default.
-`WithBaseURL` is useful for a local test server; use a trusted destination
-because requests include the API key.
+`Config.BaseURL` or `WithBaseURL` is useful for a local test server; use a
+trusted destination because requests include the API key.
 
 ## Choose a payment flow
 
@@ -269,7 +275,7 @@ cancellationStatus := response.Status
 Use a portal test key and `WithSandbox()`:
 
 ```go
-client := phajay.New(testKey, phajay.WithSandbox())
+client := phajay.New(phajay.Config{APIKey: testKey}, phajay.WithSandbox())
 ```
 
 The sandbox uses the gateway host with separate test paths. It supports payment
@@ -316,8 +322,16 @@ Configure the relevant webhook URL in the Phajay portal. Before decoding or
 using callback data, verify the signature over the original request body. The
 [public signature guide](https://payment-doc.lailaolab.com/v1/verify-webhook-signature)
 does not include the verification method or signing key; request those from
-Phajay support. The SDK provides payload types, but it does not verify sender
-identity.
+Phajay support. `DecodeWebhook` enforces the client policy, returning
+`ErrWebhookSignatureKeyMissing` if the key is missing/blank, otherwise
+`ErrWebhookSignatureVerificationUnavailable` for every request. Configuring a
+key alone cannot enable verification. These errors can be inspected with
+`errors.Is`; no production webhook can currently be accepted through this method.
+
+For development and tests only, explicitly configure
+`BypassSignatureVerification: true`. This skips all signature checks and allows
+unauthenticated JSON decoding. Never use bypassed data to authorize production
+payments. Missing configuration and `WithSandbox()` never enable bypass.
 
 Select the type for the flow that produced the callback:
 
@@ -330,15 +344,15 @@ Select the type for the flow that produced the callback:
 | Sandbox payment link | `SandboxPaymentLinkWebhookCallback` | Optional `Status`, with a distinct sandbox field schema. |
 
 The SDK represents optional callback values as pointers. The following handler
-factory takes application functions for signature verification and durable
-payment processing. Import `context`, `encoding/json`, `io`, and `net/http` in addition
-to `phajay`. `verify` must implement Phajay's supplied verification method;
-`process` must match the saved transaction and amount and apply the payment
-once, including handling already processed events successfully:
+factory takes a configured SDK client and an application function for durable
+payment processing. Import `context`, `errors`, `io`, and `net/http` in addition
+to `phajay`. The handler currently rejects every request when verification is
+enabled. `process` must match the saved transaction and amount and apply the
+payment once, including handling already processed events successfully:
 
 ```go
 func QRWebhookHandler(
-	verify func(http.Header, []byte) error,
+	client *phajay.Phajay,
 	process func(context.Context, phajay.PaymentQRWebhookCallback) error,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -347,7 +361,7 @@ func QRWebhookHandler(
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		if verify == nil || process == nil {
+		if client == nil || process == nil {
 			http.Error(w, "handler not configured", http.StatusInternalServerError)
 			return
 		}
@@ -358,13 +372,14 @@ func QRWebhookHandler(
 			http.Error(w, "invalid body", http.StatusBadRequest)
 			return
 		}
-		if err := verify(r.Header, rawBody); err != nil {
-			http.Error(w, "invalid signature", http.StatusUnauthorized)
-			return
-		}
 		var callback phajay.PaymentQRWebhookCallback
-		if err := json.Unmarshal(rawBody, &callback); err != nil {
-			http.Error(w, "invalid body", http.StatusBadRequest)
+		if err := client.DecodeWebhook(rawBody, r.Header, &callback); err != nil {
+			if errors.Is(err, phajay.ErrWebhookSignatureKeyMissing) ||
+				errors.Is(err, phajay.ErrWebhookSignatureVerificationUnavailable) {
+				http.Error(w, "webhook verification unavailable", http.StatusServiceUnavailable)
+			} else {
+				http.Error(w, "webhook rejected", http.StatusBadRequest)
+			}
 			return
 		}
 		if err := process(r.Context(), callback); err != nil {
@@ -383,7 +398,9 @@ them. Plain value fields reflect the documented guaranteed subset, but JSON
 decoding does not enforce their presence; validate identifiers and amounts in
 your application.
 
-Return HTTP 200 after accepting a verified callback. Link `RefNo` remains a
+Return HTTP 200 after accepting a verified callback (or a bypassed test event).
+A successful bypassed decode does not authenticate the sender. Direct
+`json.Unmarshal` also does not authenticate callback data. Link `RefNo` remains a
 `*string` and accepts JSON numbers and strings. QR `RefNo` is a
 `*FlexibleString`; use `string(*callback.RefNo)` after checking for nil. Both
 preserve numeric reference text without rounding large integers.

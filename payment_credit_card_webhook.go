@@ -25,8 +25,8 @@ type CreditCardTransactionAmount struct {
 
 // CreditCardWebhookCallback is the card payment callback sent to the configured
 // webhook URL. The card documentation does not guarantee a mandatory subset,
-// so fields are pointers. Decode only after verifying the webhook signature
-// using the guide and key supplied by Phajay support.
+// so fields are pointers. Use Phajay.DecodeWebhook to enforce the verification
+// policy; direct JSON decoding does not authenticate the sender.
 type CreditCardWebhookCallback struct {
 	Message           *string                      `json:"message"`
 	TransactionID     *string                      `json:"transactionId"`

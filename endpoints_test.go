@@ -130,7 +130,7 @@ func TestDocumentedEndpoints(t *testing.T) {
 				_, _ = io.WriteString(w, tt.response)
 			}))
 			defer srv.Close()
-			got, err := tt.call(context.Background(), New("test-key", WithBaseURL(srv.URL+"/")))
+			got, err := tt.call(context.Background(), New(Config{APIKey: "test-key"}, WithBaseURL(srv.URL+"/")))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -158,7 +158,7 @@ func TestEndpointFailures(t *testing.T) {
 					_, _ = io.WriteString(w, failure.body)
 				}))
 				defer srv.Close()
-				_, err := endpoint.call(context.Background(), New("key", WithBaseURL(srv.URL)))
+				_, err := endpoint.call(context.Background(), New(Config{APIKey: "key"}, WithBaseURL(srv.URL)))
 				if err == nil || !strings.HasPrefix(err.Error(), "phajay: ") {
 					t.Fatalf("error = %v", err)
 				}
@@ -181,10 +181,10 @@ func TestEndpointsCancelAndRejectUnsupportedSandbox(t *testing.T) {
 			defer srv.Close()
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			if _, err := tt.call(ctx, New("key", WithBaseURL(srv.URL))); !errors.Is(err, context.Canceled) {
+			if _, err := tt.call(ctx, New(Config{APIKey: "key"}, WithBaseURL(srv.URL))); !errors.Is(err, context.Canceled) {
 				t.Errorf("canceled error = %v", err)
 			}
-			if _, err := tt.call(context.Background(), New("key", WithBaseURL(srv.URL), WithSandbox())); err == nil || !strings.Contains(err.Error(), "sandbox") {
+			if _, err := tt.call(context.Background(), New(Config{APIKey: "key"}, WithBaseURL(srv.URL), WithSandbox())); err == nil || !strings.Contains(err.Error(), "sandbox") {
 				t.Errorf("sandbox error = %v", err)
 			}
 			if calls.Load() != 0 {
@@ -198,7 +198,7 @@ func TestValidationBeforeHTTP(t *testing.T) {
 	var calls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
 	defer srv.Close()
-	p := New("key", WithBaseURL(srv.URL))
+	p := New(Config{APIKey: "key"}, WithBaseURL(srv.URL))
 	ctx := context.Background()
 	for _, amount := range []float64{0, -1, math.NaN(), math.Inf(1), math.Inf(-1)} {
 		for _, method := range []string{"link", "QR", "card", "subscription"} {
@@ -280,7 +280,7 @@ func TestTransactionStatusResponseVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, tt.payload) }))
 			defer srv.Close()
-			got, err := New("key", WithBaseURL(srv.URL)).CheckTransactionStatus(context.Background(), "id")
+			got, err := New(Config{APIKey: "key"}, WithBaseURL(srv.URL)).CheckTransactionStatus(context.Background(), "id")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -311,7 +311,7 @@ func TestEscapedIdentifiers(t *testing.T) {
 				_, _ = io.WriteString(w, `{"message":"SUCCESSFULLY"}`)
 			}))
 			defer srv.Close()
-			if _, err := tt.call(context.Background(), New("key", WithBaseURL(srv.URL))); err != nil {
+			if _, err := tt.call(context.Background(), New(Config{APIKey: "key"}, WithBaseURL(srv.URL))); err != nil {
 				t.Fatal(err)
 			}
 		})

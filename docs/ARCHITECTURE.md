@@ -12,7 +12,8 @@ Use the [integration guide](INTEGRATION.md) for application examples and the
 
 The SDK constructs gateway requests and decodes responses. Your application
 owns order storage, customer navigation, QR display, webhook handling,
-signature verification, reconciliation, and fulfillment.
+body reading, reconciliation, and fulfillment. The SDK enforces the configured
+webhook verification policy through `DecodeWebhook`.
 
 ```mermaid
 flowchart LR
@@ -36,7 +37,8 @@ flowchart LR
 ```
 
 Callbacks arrive at an application HTTP endpoint. They do not pass through the
-SDK client. The callback types are used by the application during JSON decoding.
+SDK HTTP client. The application passes original body bytes and headers to
+`DecodeWebhook` before processing callback data.
 The SDK creates no background goroutines, polling workers, or HTTP server.
 
 ## Source map
@@ -47,7 +49,8 @@ features within one package; they do not define independent packages.
 | File | Responsibility |
 | --- | --- |
 | [`doc.go`](../doc.go) | Package documentation and supported feature overview. |
-| [`phajay.go`](../phajay.go) | Client state, constructor, and functional options. |
+| [`phajay.go`](../phajay.go) | Config, client state, constructor, and functional options. |
+| [`webhook.go`](../webhook.go) | Fail-closed verification policy and shared callback decoding. |
 | [`request.go`](../request.go) | HTTP request execution, authentication, `APIError`, shared validation, path escaping, and production-only guard. |
 | [`payment_link.go`](../payment_link.go) | Payment link request/response types and production/sandbox route selection. |
 | [`payment_qr.go`](../payment_qr.go) | Bank constants, QR types, bank route lookup, and sandbox restrictions. |
@@ -63,15 +66,18 @@ features within one package; they do not define independent packages.
 
 ## Client construction and lifetime
 
-`New(key, opts...)` creates a `*Phajay` with private fields for its key, base
-URL, `*http.Client`, and sandbox flag. Defaults are the gateway host
-`https://payment-gateway.phajay.co`, a 30-second timeout, and production routes.
+`New(Config, opts...)` creates a `*Phajay` with private fields for its API key,
+base URL, `*http.Client`, sandbox flag, webhook signing key, and bypass flag. Defaults are the gateway host
+`https://payment-gateway.phajay.co`, a 30-second timeout, production routes,
+and mandatory webhook verification (`BypassSignatureVerification: false`).
+`Config.BaseURL` overrides the host when non-empty. The signing key is separate
+from the API key; missing signing configuration never enables bypass.
 
-`Option` is `func(*Phajay)`. Options apply in the supplied order during `New`:
+`Option` is `func(*Phajay)`. Options apply after Config, in the supplied order during `New`:
 
 | Option | Effect |
 | --- | --- |
-| `WithBaseURL` | Replace the gateway base URL. |
+| `WithBaseURL` | Replace the gateway base URL, overriding Config. |
 | `WithHTTPClient` | Copy a supplied `http.Client` value; nil preserves the current client. |
 | `WithTimeout` | Set the configured client's timeout; zero disables it. |
 | `WithSandbox` | Select supported test routes and reject other operations. |
@@ -199,9 +205,19 @@ while preserving its public `*string` field type. Refund amount decoding also
 accepts numbers and numeric strings, then converts the value to `float64`.
 
 The [public webhook verification guide](https://payment-doc.lailaolab.com/v1/verify-webhook-signature)
-requires obtaining the verification method and signing key from Phajay support.
-The application must verify the original request bytes before using decoded
-callback data.
+withholds the signing algorithm, signed payload, encoding, header name, and key
+format. `VerifyWebhookSignature(rawBody, headers)` therefore fails closed:
+missing/blank signing keys return `ErrWebhookSignatureKeyMissing`; all requests
+with configured keys return `ErrWebhookSignatureVerificationUnavailable`.
+No cryptographic algorithm or comparison is implemented without the private guide.
+
+`DecodeWebhook(rawBody, headers, callback)` calls verification before
+`json.Unmarshal` and leaves the target untouched on a verification failure.
+The application supplies exact original bytes and a non-nil callback pointer.
+With explicit bypass, verification returns nil without examining the body,
+headers, or key. Bypassed callbacks remain unauthenticated and are only suitable
+for development and tests. Sandbox does not enable bypass. Direct JSON decoding
+of callback types remains unauthenticated and does not apply client policy.
 
 ## Payment processing in an application
 
@@ -250,10 +266,11 @@ a payment state machine.
 
 | Files | Coverage area |
 | --- | --- |
-| `phajay_test.go` | Options, client copying, underlying errors, and error body limit. |
+| `phajay_test.go` | Config, options, client copying, underlying errors, and error body limit. |
 | `payment_link_test.go`, `payment_qr_test.go` | Payment requests, bank routes, validation, and gateway errors. |
 | `endpoints_test.go` | Status, refund, card, and subscription methods; auth, payloads, cancellation, response variants, and escaped identifiers. |
 | `sandbox_test.go` | Supported sandbox routes and M MoneyX rejection. |
+| `webhook_test.go` | Mandatory verification, fail-closed errors, unchanged targets on rejection, explicit bypass for every callback type, and JSON errors. |
 | `callbacks_test.go`, `*_webhook_test.go` | Minimal callback payloads, null fields, reference precision, nested card fields, subscription events, and refund amounts. |
 
 Tests use local `httptest` servers and literal JSON payloads. They require no

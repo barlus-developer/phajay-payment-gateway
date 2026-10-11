@@ -3,17 +3,48 @@
 Thanks for your interest in contributing to the Phajay Payment Gateway SDK for
 Go. This document describes how to report issues and propose changes.
 
+Read the [architecture guide](docs/ARCHITECTURE.md) to understand the request
+helper, endpoint files, and callback models. The
+[developer integration guide](docs/INTEGRATION.md) shows how applications use
+the SDK. Repository conventions are recorded in [AGENTS.md](AGENTS.md).
+
 ## Getting started
 
 - **Go 1.23** or later is required.
 - The SDK has no third-party dependencies, so no `go mod tidy` step beyond the
   standard module setup is needed.
+- Git and a Go installation that supports the race detector are required for
+  the test command. Tests use local `httptest` servers; no Phajay credentials or
+  live gateway access are required.
 
 ```bash
 git clone https://github.com/barlus-developer/phajay-payment-gateway.git
 cd phajay-payment-gateway
 go test ./... -race -cover
 ```
+
+This repository builds a library. Check compilation and preview package docs
+locally with:
+
+```bash
+go build ./...
+go doc .
+```
+
+## Find the code to change
+
+| Change | Start here |
+| --- | --- |
+| Client configuration | `phajay.go`, `phajay_test.go` |
+| Shared HTTP behavior or errors | `request.go`, `phajay_test.go`, `endpoints_test.go` |
+| Payment links or bank QR | `payment_link.go`, `payment_qr.go`, and their matching tests |
+| Status, refunds, cards, subscriptions | `transaction.go`, `refund.go`, `payment_credit_card.go`, `subscription.go`, `endpoints_test.go` |
+| Callback fields or decoding | The corresponding `*_webhook.go`, `callbacks_test.go`, and `*_webhook_test.go` |
+| Sandbox routing | `payment_link.go`, `payment_qr.go`, `request.go`, `sandbox_test.go` |
+| User documentation | `README.md`, `docs/INTEGRATION.md`, `docs/ARCHITECTURE.md`, `docs/README.md` |
+
+See the [architecture source map](docs/ARCHITECTURE.md#source-map) for individual
+file responsibilities.
 
 ## Reporting issues
 
@@ -46,6 +77,8 @@ avoid duplicates. A good issue includes:
 
 6. Run `go vet ./...`.
 7. Update `README.md`, `CHANGELOG.md`, and this guide when the public API changes.
+   Update the integration examples and architecture guide when behavior or
+   implementation boundaries change.
 8. Open a pull request against `main` with a clear description of the problem
    and solution.
 
@@ -53,10 +86,81 @@ avoid duplicates. A good issue includes:
 
 - Follow standard Go conventions (`gofmt`, `go vet`).
 - Keep exported types and functions documented with Go doc comments.
+- Document exported constants and methods too; describe constraints, errors,
+  and optional fields that a caller needs to handle.
 - Write table-driven tests for new behaviour.
 - Keep the package flat and dependency-free; preserve the functional-options API.
 - Wrap underlying errors with `%w` and prefix SDK errors with `phajay: `.
 - Validate inputs before sending requests, including finite positive amounts.
+
+## Implement an endpoint
+
+1. Confirm the route, HTTP method, authentication, field names, response shape,
+   and environment support against the official documentation. Include the
+   source link in the pull request so reviewers can assess the contract.
+2. Add request and response types in the root file for the feature. Keep JSON
+   tags consistent with the wire format, including documented unusual spellings.
+   Use pointers for optional callback fields and preserve timestamp text.
+3. Add a method with `ctx context.Context` as its first parameter and a typed
+   response plus `error`. Return a zero response on local validation failure.
+4. Validate inputs before calling `p.do`. For production-only operations, call
+   `requireProduction`; use `pathID` for identifiers placed in lookup paths.
+5. Call `p.do` with the documented method, path, authentication enum, operation
+   name, and response pointer. Keep transport logic in the shared helper.
+6. Add or update tests for observable behavior and update the public docs. A new
+   bank also needs its `Bank` constant, `bankPath` mapping, and explicit sandbox
+   behavior.
+
+Use `WithBaseURL(server.URL)` to direct the client to an `httptest` server.
+Use `WithHTTPClient` for transport-specific behavior. Avoid real payment or
+refund requests in the unit suite.
+
+## Test expectations
+
+Use table-driven cases and inline payloads. For an endpoint change, cover the
+behavior that can break an integration:
+
+| Concern | What the test should establish |
+| --- | --- |
+| Routing and auth | Exact literal path, method, authentication header, and content type. |
+| Request body | Field names, values, and omission of fields tagged `omitempty`. |
+| Success decoding | Typed response fields, nullable data, and documented representation variants. |
+| Validation | Invalid inputs return an error and send zero HTTP requests. |
+| Environment | Supported sandbox path or local rejection for an unsupported operation. |
+| Failure | Non-2xx responses expose `APIError`; underlying failures remain inspectable. |
+| Cancellation | Caller cancellation reaches the request and remains discoverable through wrapping. |
+| Callbacks | Missing/null optional fields remain nil; reference numbers retain precision. |
+
+Always run tests with both the race detector and coverage:
+
+```bash
+gofmt -w .
+go vet ./...
+go test ./... -race -cover
+```
+
+The existing GitHub Actions workflow runs the same test command on Go 1.23 for
+pull requests and pushes to `main` or `master`. Formatting and vet are local
+contributor checks. Keep changes compatible with the minimum Go version in
+`go.mod`.
+
+## Documentation changes
+
+Use the [documentation index](docs/README.md) to choose the right guide. Keep
+method signatures and field tables in the README API reference, application
+examples in the integration guide, and implementation explanations in the
+architecture guide. Use relative links for repository files.
+
+Label fragments with their assumed variables and imports. Complete programs
+must include package and import declarations. Use placeholder credentials and
+application-generated identifiers. Webhook examples must require verification
+before processing callback data; the SDK has no signature verifier.
+
+For public API changes, update the README field tables, this contributor guide,
+and `CHANGELOG.md` under `Unreleased`. Include migration examples and a breaking
+change marker when an exported field type or other contract changes. For a
+documentation-only change, review links and examples against the source; the
+SDK behavior is unchanged.
 
 ## Gateway API changes
 

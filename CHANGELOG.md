@@ -8,8 +8,13 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.0-alpha1] - 2026-10-11
+
 ### Added
 
+- Developer integration examples, contributor implementation guidance, and an
+  architecture guide with request and payment flow diagrams, linked from a
+  documentation index.
 - Optional unique `OrderNo` on `PaymentQRRequest`.
 - `CheckTransactionStatus` with nullable transaction details and status constants.
 - `RequestRefund` and `CheckRefundStatus`, accepting numeric and string refund amounts.
@@ -74,7 +79,8 @@ and this project adheres to
 
 - Payment link creation via `CreatePaymentLink`.
 
-[Unreleased]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.4.0-alpha1...HEAD
+[Unreleased]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.5.0-alpha1...HEAD
+[0.5.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.4.0-alpha1...v0.5.0-alpha1
 [0.4.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.3.0-alpha...v0.4.0-alpha1
 [0.3.0-alpha]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.2.0-alpha1...v0.3.0-alpha
 [0.2.0-alpha1]: https://github.com/barlus-developer/phajay-payment-gateway/compare/v0.2.0-alpha...v0.2.0-alpha1

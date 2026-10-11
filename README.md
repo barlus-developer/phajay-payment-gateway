@@ -24,8 +24,21 @@ The SDK provides a typed client for the Phajay payment gateway with support for:
 - **Webhook callbacks** — decode bank, card, subscription, and sandbox link
   notifications.
 
+## Documentation
+
+| Guide | Use it to |
+| --- | --- |
+| [Developer integration guide](docs/INTEGRATION.md) | Configure a client, create payments, handle callbacks, and manage refunds and subscriptions. |
+| [API reference](#api-reference) | Look up methods, request and response fields, and callback types. |
+| [Contributor guide](CONTRIBUTING.md) | Set up local development, extend the SDK, and prepare a pull request. |
+| [Architecture](docs/ARCHITECTURE.md) | Understand package boundaries, request processing, authentication, and callback decoding. |
+| [Changelog](CHANGELOG.md) | Review changes and migration requirements. |
+
+Start with the [documentation index](docs/README.md) for a suggested reading order.
+
 ## Table of contents
 
+- [Documentation](#documentation)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
